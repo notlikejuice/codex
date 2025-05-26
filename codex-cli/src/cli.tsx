@@ -45,6 +45,7 @@ import { createInputItem } from "./utils/input-utils";
 import { initLogger } from "./utils/logger/log";
 import { isModelSupportedForResponses } from "./utils/model-utils.js";
 import { parseToolCall } from "./utils/parsers";
+import { clearSessionMemory, sessionMemoryStatus } from "./utils/storage/session-memory.js";
 import { onExit, setInkRenderer } from "./utils/terminal";
 import chalk from "chalk";
 import { spawnSync } from "child_process";
@@ -69,6 +70,7 @@ const cli = meow(
   Usage
     $ codex [options] <prompt>
     $ codex completion <bash|zsh|fish>
+    $ codex memory <clear|status>
 
   Options
     --version                       Print version and exit
@@ -284,6 +286,33 @@ let config = loadConfig(undefined, undefined, {
   projectDocPath: cli.flags.projectDoc,
   isFullContext: fullContextMode,
 });
+
+// Project-local session memory commands
+if (cli.input[0] === "memory") {
+  const cmd = cli.input[1];
+  if (cmd === "clear") {
+    clearSessionMemory();
+    // eslint-disable-next-line no-console
+    console.log(`Session memory cleared for project at ${process.cwd()}`);
+    process.exit(0);
+  }
+  if (cmd === "status") {
+    const status = sessionMemoryStatus();
+    if (!status.exists) {
+      // eslint-disable-next-line no-console
+      console.log(`No session memory found for project at ${process.cwd()}`);
+    } else {
+      // eslint-disable-next-line no-console
+      console.log(
+        `Session memory loaded: id=${status.session?.id} items=${status.itemsCount}`,
+      );
+    }
+    process.exit(0);
+  }
+  // eslint-disable-next-line no-console
+  console.error("Usage: codex memory <clear|status>");
+  process.exit(1);
+}
 
 // `prompt` can be updated later when the user resumes a previous session
 // via the `--history` flag. Therefore it must be declared with `let` rather

@@ -28,17 +28,21 @@ import {
 import { createOpenAIClient } from "../../utils/openai-client.js";
 import { shortCwd } from "../../utils/short-path.js";
 import { saveRollout } from "../../utils/storage/save-rollout.js";
+import { loadSessionMemory, saveSessionMemory } from "../../utils/storage/session-memory.js";
 import { CLI_VERSION } from "../../version.js";
 import ApprovalModeOverlay from "../approval-mode-overlay.js";
 import DiffOverlay from "../diff-overlay.js";
 import HelpOverlay from "../help-overlay.js";
 import HistoryOverlay from "../history-overlay.js";
+import MemoryOverlay from "../memory-overlay.js";
 import ModelOverlay from "../model-overlay.js";
 import SessionsOverlay from "../sessions-overlay.js";
 import chalk from "chalk";
 import fs from "fs/promises";
 import { Box, Text } from "ink";
 import { spawn } from "node:child_process";
+import os from "os";
+import path from "path";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { inspect } from "util";
 
@@ -49,7 +53,8 @@ export type OverlayModeType =
   | "model"
   | "approval"
   | "help"
-  | "diff";
+  | "diff"
+  | "memory";
 
 type Props = {
   config: AppConfig;
@@ -148,7 +153,10 @@ export default function TerminalChat({
   const [model, setModel] = useState<string>(config.model);
   const [provider, setProvider] = useState<string>(config.provider || "openai");
   const [lastResponseId, setLastResponseId] = useState<string | null>(null);
-  const [items, setItems] = useState<Array<ResponseItem>>([]);
+  const memoryEnabled = Boolean(config.memory?.enabled);
+  const memory = memoryEnabled ? loadSessionMemory() : null;
+  const [sessionId] = useState<string>(() => memory?.session.id ?? crypto.randomUUID());
+  const [items, setItems] = useState<Array<ResponseItem>>(memory?.items ?? []);
   const [loading, setLoading] = useState<boolean>(false);
   const [approvalPolicy, setApprovalPolicy] = useState<ApprovalPolicy>(
     initialApprovalPolicy,
@@ -242,7 +250,6 @@ export default function TerminalChat({
     // Tear down any existing loop before creating a new one.
     agentRef.current?.terminate();
 
-    const sessionId = crypto.randomUUID();
     agentRef.current = new AgentLoop({
       model,
       provider,
@@ -257,6 +264,17 @@ export default function TerminalChat({
         setItems((prev) => {
           const updated = uniqueById([...prev, item as ResponseItem]);
           saveRollout(sessionId, updated);
+          if (memoryEnabled) {
+            const sessionInfo = {
+              id: sessionId,
+              user: "",
+              version: CLI_VERSION,
+              model,
+              timestamp: new Date().toISOString(),
+              instructions: config.instructions,
+            };
+            saveSessionMemory(sessionInfo, updated);
+          }
           return updated;
         });
       },
@@ -526,6 +544,7 @@ export default function TerminalChat({
             openApprovalOverlay={() => setOverlayMode("approval")}
             openHelpOverlay={() => setOverlayMode("help")}
             openSessionsOverlay={() => setOverlayMode("sessions")}
+            openMemoryOverlay={() => setOverlayMode("memory")}
             openDiffOverlay={() => {
               const { isGitRepo, diff } = getGitDiff();
               let text: string;
@@ -752,6 +771,89 @@ export default function TerminalChat({
 
         {overlayMode === "help" && (
           <HelpOverlay onExit={() => setOverlayMode("none")} />
+        )}
+
+        {overlayMode === "memory" && (
+          <MemoryOverlay
+            onSelect={async (option) => {
+              if (option === 'on') {
+                // Enable memory
+                const updatedConfig = {
+                  ...config,
+                  memory: {
+                    ...config.memory,
+                    enabled: true,
+                  },
+                };
+                saveConfig(updatedConfig);
+                
+                setItems((prev) => [
+                  ...prev,
+                  {
+                    id: `memory-enabled-${Date.now()}`,
+                    type: "message",
+                    role: "system",
+                    content: [
+                      {
+                        type: "input_text",
+                        text: "✓ Memory enabled - session data will be persisted",
+                      },
+                    ],
+                  },
+                ]);
+              } else if (option === 'off') {
+                // Disable memory
+                const updatedConfig = {
+                  ...config,
+                  memory: {
+                    ...config.memory,
+                    enabled: false,
+                  },
+                };
+                saveConfig(updatedConfig);
+                
+                setItems((prev) => [
+                  ...prev,
+                  {
+                    id: `memory-disabled-${Date.now()}`,
+                    type: "message",
+                    role: "system",
+                    content: [
+                      {
+                        type: "input_text",
+                        text: "✓ Memory disabled - session data will not be persisted",
+                      },
+                    ],
+                  },
+                ]);
+              } else if (option === 'clear') {
+                // Clear memory
+                const { clearSessionMemory } = await import("../../utils/storage/session-memory.js");
+                clearSessionMemory();
+                
+                const sessionDir = path.join(process.cwd(), ".codex");
+                const sessionFile = path.join(sessionDir, "session.json");
+                const sessionFilePath = sessionFile.replace(os.homedir(), "~");
+                
+                setItems((prev) => [
+                  ...prev,
+                  {
+                    id: `memory-cleared-${Date.now()}`,
+                    type: "message",
+                    role: "system",
+                    content: [
+                      {
+                        type: "input_text",
+                        text: `✓ Memory cleared - session data removed from ${sessionFilePath}`,
+                      },
+                    ],
+                  },
+                ]);
+              }
+              setOverlayMode("none");
+            }}
+            onExit={() => setOverlayMode("none")}
+          />
         )}
 
         {overlayMode === "diff" && (
