@@ -31,6 +31,7 @@ import {
 } from "../session.js";
 import { applyPatchToolInstructions } from "./apply-patch.js";
 import { handleExecCommand } from "./handle-exec-command.js";
+import { GithubCopilotClient } from "../openai-client.js";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -306,7 +307,10 @@ export class AgentLoop {
     this.sessionId = getSessionId() || randomUUID().replaceAll("-", "");
     // Configure OpenAI client with optional timeout (ms) from environment
     const timeoutMs = OPENAI_TIMEOUT_MS;
-    const apiKey = this.config.apiKey ?? process.env["OPENAI_API_KEY"] ?? "";
+    const apiKey =
+      this.config.apiKey ??
+      process.env[`${this.provider.toUpperCase()}_API_KEY`] ??
+      "";
     const baseURL = getBaseUrl(this.provider);
 
     this.oai = new OpenAI({
@@ -336,6 +340,24 @@ export class AgentLoop {
         apiKey,
         baseURL,
         apiVersion: AZURE_OPENAI_API_VERSION,
+        defaultHeaders: {
+          originator: ORIGIN,
+          version: CLI_VERSION,
+          session_id: this.sessionId,
+          ...(OPENAI_ORGANIZATION
+            ? { "OpenAI-Organization": OPENAI_ORGANIZATION }
+            : {}),
+          ...(OPENAI_PROJECT ? { "OpenAI-Project": OPENAI_PROJECT } : {}),
+        },
+        httpAgent: PROXY_URL ? new HttpsProxyAgent(PROXY_URL) : undefined,
+        ...(timeoutMs !== undefined ? { timeout: timeoutMs } : {}),
+      });
+    }
+
+    if (this.provider.toLowerCase() === "githubcopilot") {
+      this.oai = new GithubCopilotClient({
+        ...(apiKey ? { apiKey } : {}),
+        baseURL,
         defaultHeaders: {
           originator: ORIGIN,
           version: CLI_VERSION,

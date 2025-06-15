@@ -56,6 +56,7 @@ describe("/clear command", () => {
       openHelpOverlay: () => {},
       openDiffOverlay: () => {},
       openSessionsOverlay: () => {},
+      openMemoryOverlay: () => {},
       onCompact: () => {},
       interruptAgent: () => {},
       active: true,

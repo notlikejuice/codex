@@ -561,6 +561,10 @@ export const saveConfig = (
     flexMode: config.flexMode,
     reasoningEffort: config.reasoningEffort,
   };
+  // Persist memory settings when explicitly configured
+  if (config.memory !== undefined) {
+    configToSave.memory = config.memory;
+  }
 
   // Add history settings if they exist
   if (config.history) {

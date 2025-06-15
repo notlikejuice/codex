@@ -79,8 +79,10 @@ export default function TerminalChatInput({
   openHelpOverlay: () => void;
   openDiffOverlay: () => void;
   openSessionsOverlay: () => void;
+  openMemoryOverlay: () => void;
   onCompact: () => void;
   interruptAgent: () => void;
+  onMemoryCommand?: (command: string) => void;
   active: boolean;
   thinkingSeconds: number;
   // New: current conversation items so we can include them in bug reports
@@ -496,6 +498,10 @@ export default function TerminalChatInput({
       } else if (inputValue === "/help") {
         setInput("");
         openHelpOverlay();
+        return;
+      } else if (inputValue === "/memory") {
+        setInput("");
+        openMemoryOverlay();
         return;
       } else if (inputValue === "/diff") {
         setInput("");

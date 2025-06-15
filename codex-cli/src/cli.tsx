@@ -39,12 +39,14 @@ import {
 } from "./utils/config";
 import {
   getApiKey as fetchApiKey,
+  getGithubCopilotApiKey as fetchGithubCopilotApiKey,
   maybeRedeemCredits,
 } from "./utils/get-api-key";
 import { createInputItem } from "./utils/input-utils";
 import { initLogger } from "./utils/logger/log";
 import { isModelSupportedForResponses } from "./utils/model-utils.js";
 import { parseToolCall } from "./utils/parsers";
+import { clearSessionMemory, sessionMemoryStatus } from "./utils/storage/session-memory.js";
 import { onExit, setInkRenderer } from "./utils/terminal";
 import chalk from "chalk";
 import { spawnSync } from "child_process";
@@ -69,6 +71,7 @@ const cli = meow(
   Usage
     $ codex [options] <prompt>
     $ codex completion <bash|zsh|fish>
+    $ codex memory <clear|status>
 
   Options
     --version                       Print version and exit
@@ -285,6 +288,33 @@ let config = loadConfig(undefined, undefined, {
   isFullContext: fullContextMode,
 });
 
+// Project-local session memory commands
+if (cli.input[0] === "memory") {
+  const cmd = cli.input[1];
+  if (cmd === "clear") {
+    clearSessionMemory();
+    // eslint-disable-next-line no-console
+    console.log(`Session memory cleared for project at ${process.cwd()}`);
+    process.exit(0);
+  }
+  if (cmd === "status") {
+    const status = sessionMemoryStatus();
+    if (!status.exists) {
+      // eslint-disable-next-line no-console
+      console.log(`No session memory found for project at ${process.cwd()}`);
+    } else {
+      // eslint-disable-next-line no-console
+      console.log(
+        `Session memory loaded: id=${status.session?.id} items=${status.itemsCount}`,
+      );
+    }
+    process.exit(0);
+  }
+  // eslint-disable-next-line no-console
+  console.error("Usage: codex memory <clear|status>");
+  process.exit(1);
+}
+
 // `prompt` can be updated later when the user resumes a previous session
 // via the `--history` flag. Therefore it must be declared with `let` rather
 // than `const`.
@@ -322,12 +352,38 @@ try {
     if (data.OPENAI_API_KEY && !expired) {
       apiKey = data.OPENAI_API_KEY;
     }
+    if (
+      data.GITHUBCOPILOT_API_KEY &&
+      provider.toLowerCase() === "githubcopilot"
+    ) {
+      apiKey = data.GITHUBCOPILOT_API_KEY;
+    }
   }
 } catch {
   // ignore errors
 }
 
-if (cli.flags.login) {
+if (provider.toLowerCase() === "githubcopilot" && !apiKey) {
+  apiKey = await fetchGithubCopilotApiKey();
+  try {
+    const home = os.homedir();
+    const authDir = path.join(home, ".codex");
+    const authFile = path.join(authDir, "auth.json");
+    fs.writeFileSync(
+      authFile,
+      JSON.stringify(
+        {
+          GITHUBCOPILOT_API_KEY: apiKey,
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+  } catch {
+    /* ignore */
+  }
+} else if (cli.flags.login) {
   apiKey = await fetchApiKey(client.issuer, client.client_id);
   try {
     const home = os.homedir();
@@ -344,7 +400,7 @@ if (cli.flags.login) {
   apiKey = await fetchApiKey(client.issuer, client.client_id);
 }
 // Ensure the API key is available as an environment variable for legacy code
-process.env["OPENAI_API_KEY"] = apiKey;
+process.env[`${provider.toUpperCase()}_API_KEY`] = apiKey;
 
 if (cli.flags.free) {
   // eslint-disable-next-line no-console
@@ -383,9 +439,11 @@ if (!apiKey && !NO_API_KEY_REQUIRED.has(provider.toLowerCase())) {
             ? `You can create a ${chalk.bold(
                 `${provider.toUpperCase()}_API_KEY`,
               )} ` + `in the ${chalk.bold(`Google AI Studio`)}.\n`
-            : `You can create a ${chalk.bold(
-                `${provider.toUpperCase()}_API_KEY`,
-              )} ` + `in the ${chalk.bold(`${provider}`)} dashboard.\n`
+            : provider.toLowerCase() === "githubcopilot"
+              ? `Run ${chalk.bold("codex --login")} to authorize GitHub Copilot.\n`
+              : `You can create a ${chalk.bold(
+                  `${provider.toUpperCase()}_API_KEY`,
+                )} ` + `in the ${chalk.bold(`${provider}`)} dashboard.\n`
       }`,
   );
   process.exit(1);
