@@ -117,6 +117,10 @@ const cli = meow(
     $ codex "Write and run a python program that prints ASCII art"
     $ codex -q "fix build issues"
     $ codex completion bash
+
+  Supported providers:
+    openai (default), openrouter, azure, gemini, ollama, mistral,
+    deepseek, xai, groq, arceeai, githubcopilot
 `,
   {
     importMeta: import.meta,
