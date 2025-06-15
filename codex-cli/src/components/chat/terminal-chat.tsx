@@ -153,7 +153,9 @@ export default function TerminalChat({
   const [model, setModel] = useState<string>(config.model);
   const [provider, setProvider] = useState<string>(config.provider || "openai");
   const [lastResponseId, setLastResponseId] = useState<string | null>(null);
-  const memoryEnabled = Boolean(config.memory?.enabled);
+  const [memoryEnabled, setMemoryEnabled] = useState<boolean>(
+    Boolean(config.memory?.enabled),
+  );
   const memory = memoryEnabled ? loadSessionMemory() : null;
   const [sessionId] = useState<string>(() => memory?.session.id ?? crypto.randomUUID());
   const [items, setItems] = useState<Array<ResponseItem>>(memory?.items ?? []);
@@ -775,6 +777,7 @@ export default function TerminalChat({
 
         {overlayMode === "memory" && (
           <MemoryOverlay
+            memoryEnabled={memoryEnabled}
             onSelect={async (option) => {
               if (option === 'on') {
                 // Enable memory
@@ -786,7 +789,17 @@ export default function TerminalChat({
                   },
                 };
                 saveConfig(updatedConfig);
-                
+                setMemoryEnabled(true);
+                const sessionInfo = {
+                  id: sessionId,
+                  user: "",
+                  version: CLI_VERSION,
+                  model,
+                  timestamp: new Date().toISOString(),
+                  instructions: config.instructions,
+                };
+                saveSessionMemory(sessionInfo, items);
+
                 setItems((prev) => [
                   ...prev,
                   {
@@ -811,7 +824,8 @@ export default function TerminalChat({
                   },
                 };
                 saveConfig(updatedConfig);
-                
+                setMemoryEnabled(false);
+
                 setItems((prev) => [
                   ...prev,
                   {

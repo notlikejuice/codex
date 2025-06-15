@@ -1,5 +1,4 @@
 import TypeaheadOverlay from "./typeahead-overlay.js";
-import { loadConfig } from "../utils/config.js";
 import { Box, Text } from "ink";
 import os from "os";
 import path from "path";
@@ -11,14 +10,14 @@ import React from "react";
 type Props = {
   onSelect: (option: string) => void;
   onExit: () => void;
+  memoryEnabled: boolean;
 };
 
 export default function MemoryOverlay({
   onSelect,
   onExit,
+  memoryEnabled,
 }: Props): JSX.Element {
-  const config = loadConfig();
-  const memoryEnabled = Boolean(config.memory?.enabled);
   
   // Get the session file path
   const sessionDir = path.join(process.cwd(), ".codex");
