@@ -443,7 +443,7 @@ Below is a comprehensive example of `config.json` with multiple custom providers
       "envKey": "ARCEEAI_API_KEY"
     },
     "githubcopilot": {
-      "name": "GithubCopilot",
+      "name": "GitHub Copilot",
       "baseURL": "https://api.githubcopilot.com",
       "envKey": "GITHUBCOPILOT_API_KEY"
     }
