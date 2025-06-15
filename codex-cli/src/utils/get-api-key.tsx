@@ -764,3 +764,25 @@ export async function getApiKey(
 }
 
 export { maybeRedeemCredits };
+
+export async function fetchGithubCopilotApiKey(): Promise<string> {
+  if (process.env["GITHUB_COPILOT_TOKEN"]) {
+    return process.env["GITHUB_COPILOT_TOKEN"]!;
+  }
+
+  const choice = await promptUserForChoice();
+  if (choice.type === "apikey") {
+    process.env["GITHUB_COPILOT_TOKEN"] = choice.key;
+    return choice.key;
+  }
+
+  // Sign in via GitHub is not yet supported; instruct the user
+  // eslint-disable-next-line no-console
+  console.error(
+    "\n" +
+      "GitHub OAuth login is not yet implemented for Codex. " +
+      "Please generate a token manually and set it as GITHUB_COPILOT_TOKEN." +
+      "\n"
+  );
+  process.exit(1);
+}

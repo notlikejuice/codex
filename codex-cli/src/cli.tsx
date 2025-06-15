@@ -40,6 +40,7 @@ import {
 import {
   getApiKey as fetchApiKey,
   maybeRedeemCredits,
+  fetchGithubCopilotApiKey,
 } from "./utils/get-api-key";
 import { createInputItem } from "./utils/input-utils";
 import { initLogger } from "./utils/logger/log";
@@ -328,7 +329,11 @@ try {
 }
 
 if (cli.flags.login) {
-  apiKey = await fetchApiKey(client.issuer, client.client_id);
+  if (provider.toLowerCase() === "githubcopilot") {
+    apiKey = await fetchGithubCopilotApiKey();
+  } else {
+    apiKey = await fetchApiKey(client.issuer, client.client_id);
+  }
   try {
     const home = os.homedir();
     const authDir = path.join(home, ".codex");
@@ -341,7 +346,11 @@ if (cli.flags.login) {
     /* ignore */
   }
 } else if (!apiKey) {
-  apiKey = await fetchApiKey(client.issuer, client.client_id);
+  if (provider.toLowerCase() === "githubcopilot") {
+    apiKey = await fetchGithubCopilotApiKey();
+  } else {
+    apiKey = await fetchApiKey(client.issuer, client.client_id);
+  }
 }
 // Ensure the API key is available as an environment variable for legacy code
 process.env["OPENAI_API_KEY"] = apiKey;
