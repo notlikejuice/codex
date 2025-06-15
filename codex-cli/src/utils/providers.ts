@@ -53,8 +53,8 @@ export const providers: Record<
     envKey: "ARCEEAI_API_KEY",
   },
   githubcopilot: {
-    name: "GitHubCopilot",
-    baseURL: "https://copilot-proxy.githubusercontent.com/v1",
-    envKey: "GITHUB_COPILOT_TOKEN",
+    name: "GithubCopilot",
+    baseURL: "https://api.githubcopilot.com",
+    envKey: "GITHUBCOPILOT_API_KEY",
   },
 };

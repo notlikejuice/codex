@@ -106,6 +106,7 @@ export OPENAI_API_KEY="your-api-key-here"
 > - xai
 > - groq
 > - arceeai
+> - githubcopilot
 > - any other provider that is compatible with the OpenAI API
 >
 > If you use a provider other than OpenAI, you will need to set the API key for the provider in the config file or in the environment variable as:
@@ -440,6 +441,11 @@ Below is a comprehensive example of `config.json` with multiple custom providers
       "name": "ArceeAI",
       "baseURL": "https://conductor.arcee.ai/v1",
       "envKey": "ARCEEAI_API_KEY"
+    },
+    "githubcopilot": {
+      "name": "GithubCopilot",
+      "baseURL": "https://api.githubcopilot.com",
+      "envKey": "GITHUBCOPILOT_API_KEY"
     }
   },
   "history": {
@@ -473,6 +479,9 @@ export AZURE_OPENAI_API_VERSION="2025-03-01-preview" (Optional)
 
 # OpenRouter
 export OPENROUTER_API_KEY="your-openrouter-key-here"
+
+# GitHub Copilot
+export GITHUBCOPILOT_API_KEY="your-copilot-token-here"
 
 # Similarly for other providers
 ```
