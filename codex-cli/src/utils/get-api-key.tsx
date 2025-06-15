@@ -2,10 +2,12 @@ import type { Choice } from "./get-api-key-components";
 import type { Request, Response } from "express";
 
 import { ApiKeyPrompt, WaitingForAuth } from "./get-api-key-components";
+import { GithubCopilotClient } from "./openai-client.js";
+import Spinner from "../components/vendor/ink-spinner.js";
 import chalk from "chalk";
 import express from "express";
 import fs from "fs/promises";
-import { render } from "ink";
+import { Box, Text, render } from "ink";
 import crypto from "node:crypto";
 import { URL } from "node:url";
 import open from "open";
@@ -763,26 +765,29 @@ export async function getApiKey(
   }
 }
 
-export { maybeRedeemCredits };
-
-export async function fetchGithubCopilotApiKey(): Promise<string> {
-  if (process.env["GITHUB_COPILOT_TOKEN"]) {
-    return process.env["GITHUB_COPILOT_TOKEN"]!;
-  }
-
-  const choice = await promptUserForChoice();
-  if (choice.type === "apikey") {
-    process.env["GITHUB_COPILOT_TOKEN"] = choice.key;
-    return choice.key;
-  }
-
-  // Sign in via GitHub is not yet supported; instruct the user
-  // eslint-disable-next-line no-console
-  console.error(
-    "\n" +
-      "GitHub OAuth login is not yet implemented for Codex. " +
-      "Please generate a token manually and set it as GITHUB_COPILOT_TOKEN." +
-      "\n"
+export async function getGithubCopilotApiKey(): Promise<string> {
+  const { device_code, user_code, verification_uri } =
+    await GithubCopilotClient.getLoginURL();
+  const spinner = render(
+    <Box flexDirection="row" marginTop={1}>
+      <Spinner type="ball" />
+      <Text>
+        {" "}
+        Please visit {verification_uri} and enter code {user_code}
+      </Text>
+    </Box>,
   );
-  process.exit(1);
+  try {
+    const key = await GithubCopilotClient.pollForAccessToken(device_code);
+    spinner.clear();
+    spinner.unmount();
+    process.env["GITHUBCOPILOT_API_KEY"] = key;
+    return key;
+  } catch (err) {
+    spinner.clear();
+    spinner.unmount();
+    throw err;
+  }
 }
+
+export { maybeRedeemCredits };
