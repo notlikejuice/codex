@@ -10,8 +10,13 @@ import {
   OPENAI_ORGANIZATION,
   OPENAI_PROJECT,
 } from "./config.js";
+import fs from "fs";
 import OpenAI, { AzureOpenAI } from "openai";
 import * as Errors from "openai/error";
+import os from "os";
+import path from "path";
+
+const COPILOT_TOKEN_FILE = path.join(os.homedir(), ".codex", "copilot-token.json");
 
 type OpenAIClientConfig = {
   provider: string;
@@ -82,6 +87,22 @@ export class GithubCopilotClient extends OpenAI {
     ) {
       return this.copilotToken;
     }
+    try {
+      const disk = JSON.parse(fs.readFileSync(COPILOT_TOKEN_FILE, "utf-8"));
+      if (
+        typeof disk.token === "string" &&
+        typeof disk.expiration === "string"
+      ) {
+        const exp = new Date(disk.expiration);
+        if (exp.getTime() > Date.now()) {
+          this.copilotToken = disk.token;
+          this.copilotTokenExpiration = exp;
+          return this.copilotToken;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
     const resp = await fetch(
       "https://api.github.com/copilot_internal/v2/token",
       {
@@ -106,6 +127,23 @@ export class GithubCopilotClient extends OpenAI {
     }
     this.copilotToken = token;
     this.copilotTokenExpiration = new Date(Date.now() + refresh_in * 1000);
+    try {
+      fs.mkdirSync(path.dirname(COPILOT_TOKEN_FILE), { recursive: true });
+      fs.writeFileSync(
+        COPILOT_TOKEN_FILE,
+        JSON.stringify(
+          {
+            token: this.copilotToken,
+            expiration: this.copilotTokenExpiration.toISOString(),
+          },
+          null,
+          2,
+        ),
+        { mode: 0o600 },
+      );
+    } catch {
+      /* ignore */
+    }
     return token;
   }
 
